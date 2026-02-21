@@ -2,6 +2,10 @@
 
 A self-contained TPM plugin for Termux/tmux status widgets with optional Shizuku-powered data sourcing via `tooie`.
 
+Designed to work best with the `shizuku-integration` branch of:
+
+- https://github.com/PickleHik3/termux-launcher
+
 ## Features
 
 - Left widgets: battery, CPU, RAM (toggleable)
@@ -9,6 +13,8 @@ A self-contained TPM plugin for Termux/tmux status widgets with optional Shizuku
 - Optional data source: `tooie resources` (Shizuku backend) with fallback to local `/proc` + `termux-battery-status`
 - Native self-contained two-line status layout (no required split-statusbar/dotbar dependency)
 - Dotbar-compatible variables are still exported if dotbar is installed
+- Music ticker source: `kew` via MPRIS (https://github.com/ravachol/kew)
+- Weather source: wttr.in
 
 ## Install (TPM)
 
