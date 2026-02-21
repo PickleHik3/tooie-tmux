@@ -39,15 +39,25 @@ set_tmux_option_if_unset "@tooie-tmux-widget-kew" "on"
 set_tmux_option_if_unset "@tooie-tmux-status-left-length" "600"
 set_tmux_option_if_unset "@tooie-tmux-status-right-length" "400"
 set_tmux_option_if_unset "@tooie-tmux-force-two-line" "on"
+set_tmux_option_if_unset "@tooie-tmux-color-prefix-bg" "#f9f972"
+set_tmux_option_if_unset "@tooie-tmux-color-prefix-fg" "#241b30"
+set_tmux_option_if_unset "@tooie-tmux-color-base-bg" "#241b30"
+set_tmux_option_if_unset "@tooie-tmux-color-base-fg" "#55a8fb"
+set_tmux_option_if_unset "@tooie-tmux-color-kew" "#36f9f6"
+set_tmux_option_if_unset "@tooie-tmux-apps-label" "󰀻 Apps"
 
 if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
   left_len="$(get_tmux_option "@tooie-tmux-status-left-length" "600")"
   right_len="$(get_tmux_option "@tooie-tmux-status-right-length" "400")"
   two_line="$(get_tmux_option "@tooie-tmux-force-two-line" "on")"
+  prefix_bg="$(get_tmux_option "@tooie-tmux-color-prefix-bg" "#f9f972")"
+  prefix_fg="$(get_tmux_option "@tooie-tmux-color-prefix-fg" "#241b30")"
+  base_bg="$(get_tmux_option "@tooie-tmux-color-base-bg" "#241b30")"
+  base_fg="$(get_tmux_option "@tooie-tmux-color-base-fg" "#55a8fb")"
   tmux set-option -gq status-left-length "$left_len"
   tmux set-option -gq status-right-length "$right_len"
 
-  left_fmt="#\[bg=#{?client_prefix,#f9f972,#241b30},fg=#{?client_prefix,#241b30,#00fbfd},bold\] #{?client_prefix,󰘳 PREFIX,}#\[bg=#241b30,fg=#55a8fb\]#($CURRENT_DIR/scripts/render-left.sh) "
+  left_fmt="#\[bg=#{?client_prefix,${prefix_bg},${base_bg}},fg=#{?client_prefix,${prefix_fg},#00fbfd},bold\] #{?client_prefix,󰘳 PREFIX,}#\[bg=${base_bg},fg=${base_fg}\]#($CURRENT_DIR/scripts/render-left.sh) "
   right_fmt="#($CURRENT_DIR/scripts/render-right.sh)"
 
   # Native self-contained status widgets.

@@ -28,7 +28,7 @@ Reload tmux and run `prefix + I`.
 
 ## Options
 
-All enabled by default.
+Defaults are set to match the current theme/layout used in this repository.
 
 ```tmux
 # Master switch
@@ -51,11 +51,34 @@ set -g @tooie-tmux-status-right-length '400'
 
 # Force native two-line status layout managed by tooie-tmux
 set -g @tooie-tmux-force-two-line 'on'
+
+# Colors/layout (dotbar-style overrides)
+set -g @tooie-tmux-color-prefix-bg '#f9f972'
+set -g @tooie-tmux-color-prefix-fg '#241b30'
+set -g @tooie-tmux-color-base-bg '#241b30'
+set -g @tooie-tmux-color-base-fg '#55a8fb'
+set -g @tooie-tmux-color-kew '#36f9f6'
+set -g @tooie-tmux-color-separator '#6b7089'
+set -g @tooie-tmux-color-ram '#ffb86c'
+set -g @tooie-tmux-color-empty '#5f5f87'
+set -g @tooie-tmux-color-meter-1 '#ff5f5f'
+set -g @tooie-tmux-color-meter-2 '#ff875f'
+set -g @tooie-tmux-color-meter-3 '#ffd75f'
+set -g @tooie-tmux-color-meter-4 '#a4e84a'
+set -g @tooie-tmux-color-meter-5 '#6ee7a2'
+set -g @tooie-tmux-color-meter-6 '#34d399'
+set -g @tooie-tmux-color-charging '#7dcfff'
+
+# Labels/icons
+set -g @tooie-tmux-apps-label '󰀻 Apps'
+set -g @tooie-tmux-icon-battery-full ''
+set -g @tooie-tmux-icon-battery-empty ''
+set -g @tooie-tmux-icon-battery-charging ' 󱈑'
 ```
 
 ## Theme Overrides
 
-Widget script supports env overrides. For persistent theme overrides create:
+Widget script supports env overrides too. For persistent env overrides create:
 
 - `scripts/widgets/theme.conf` inside the plugin repo, or
 - set `TMUX_TOOIE_WIDGET_THEME_FILE` to a custom file path.
