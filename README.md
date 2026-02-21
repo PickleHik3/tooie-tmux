@@ -1,13 +1,14 @@
 # tooie-tmux
 
-A TPM plugin for Termux/tmux status widgets with optional Shizuku-powered data sourcing via `tooie`.
+A self-contained TPM plugin for Termux/tmux status widgets with optional Shizuku-powered data sourcing via `tooie`.
 
 ## Features
 
 - Left widgets: battery, CPU, RAM (toggleable)
 - Right widgets: kew now-playing, Apps launcher label, weather (toggleable)
 - Optional data source: `tooie resources` (Shizuku backend) with fallback to local `/proc` + `termux-battery-status`
-- Dotbar-compatible and plain tmux status fallback
+- Native self-contained two-line status layout (no required split-statusbar/dotbar dependency)
+- Dotbar-compatible variables are still exported if dotbar is installed
 
 ## Install (TPM)
 
@@ -41,6 +42,9 @@ set -g @tooie-tmux-widget-weather 'on'
 # Widths
 set -g @tooie-tmux-status-left-length '600'
 set -g @tooie-tmux-status-right-length '400'
+
+# Force native two-line status layout managed by tooie-tmux
+set -g @tooie-tmux-force-two-line 'on'
 ```
 
 ## Theme Overrides
@@ -56,3 +60,12 @@ Start from `scripts/widgets/theme.conf.example`.
 
 - Apps launcher binds `MouseDown1StatusRight` and `M-Enter`.
 - If `tooie` is unavailable/disabled, CPU+RAM+battery use local fallback metrics.
+- `@tooie-tmux-force-two-line` keeps line 1 for window list and line 2 for left/right widgets to avoid center contention truncation.
+
+## Dependencies
+
+- Required: `tmux`, `jq`
+- Optional:
+  - `tooie` (for Shizuku-backed resource snapshots)
+  - `termux-api` (`termux-battery-status`) for fallback battery data
+  - `kew` + dbus for now-playing widget
