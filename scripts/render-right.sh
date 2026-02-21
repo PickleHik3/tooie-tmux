@@ -25,7 +25,7 @@ fi
 if is_on "$show_weather"; then
   wx="$("$CURRENT_DIR/scripts/widgets/weather-cache" 2>/dev/null || true)"
   if [ -n "$wx" ]; then
-    out="$out$wx"
+    out="$out$wx "
   fi
 fi
 

@@ -15,7 +15,8 @@ backup_status_formats() {
 
 build_split_formats() {
   local base fmt_windows fmt_widgets
-  base="$(tmux show-option -gqv status-format[0])"
+  base="$(tmux show-option -gqv @tooie-tmux-backup-status-format-0)"
+  [ -n "$base" ] || base="$(tmux show-option -gqv status-format[0])"
   [ -n "$base" ] || base="$(tmux show-option -gqv status-format[6])"
   [ -n "$base" ] || base='#[align=left range=left #{E:status-left-style}]#[push-default]#{T;=/#{status-left-length}:status-left}#[pop-default]#[norange default]#[list=on align=#{status-justify}]#[list=left-marker]<#[list=right-marker]>#[list=on]#{W:#[range=window|#{window_index} #{E:window-status-style}]#[push-default]#{T:window-status-format}#[pop-default]#[norange default]#{?loop_last_flag,,#{window-status-separator}},#[range=window|#{window_index} list=focus #{?#{!=:#{E:window-status-current-style},default},#{E:window-status-current-style},#{E:window-status-style}}]#[push-default]#{T:window-status-current-format}#[pop-default]#[norange list=on default]#{?loop_last_flag,,#{window-status-separator}}}#[nolist align=right range=right #{E:status-right-style}]#[push-default]#{T;=/#{status-right-length}:status-right}#[pop-default]#[norange default]'
 
@@ -38,6 +39,7 @@ set_tmux_option_if_unset "@tooie-tmux-widget-apps" "on"
 set_tmux_option_if_unset "@tooie-tmux-widget-kew" "on"
 set_tmux_option_if_unset "@tooie-tmux-status-left-length" "600"
 set_tmux_option_if_unset "@tooie-tmux-status-right-length" "400"
+set_tmux_option_if_unset "@tooie-tmux-status-justify" "centre"
 set_tmux_option_if_unset "@tooie-tmux-force-two-line" "on"
 set_tmux_option_if_unset "@tooie-tmux-color-prefix-bg" "#f9f972"
 set_tmux_option_if_unset "@tooie-tmux-color-prefix-fg" "#241b30"
@@ -49,6 +51,7 @@ set_tmux_option_if_unset "@tooie-tmux-apps-label" "󰀻 Apps"
 if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
   left_len="$(get_tmux_option "@tooie-tmux-status-left-length" "600")"
   right_len="$(get_tmux_option "@tooie-tmux-status-right-length" "400")"
+  status_justify="$(get_tmux_option "@tooie-tmux-status-justify" "centre")"
   two_line="$(get_tmux_option "@tooie-tmux-force-two-line" "on")"
   prefix_bg="$(get_tmux_option "@tooie-tmux-color-prefix-bg" "#f9f972")"
   prefix_fg="$(get_tmux_option "@tooie-tmux-color-prefix-fg" "#241b30")"
@@ -56,11 +59,13 @@ if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
   base_fg="$(get_tmux_option "@tooie-tmux-color-base-fg" "#55a8fb")"
   tmux set-option -gq status-left-length "$left_len"
   tmux set-option -gq status-right-length "$right_len"
+  tmux set-option -gq status-justify "$status_justify"
 
-  left_fmt="#\[bg=#{?client_prefix,${prefix_bg},${base_bg}},fg=#{?client_prefix,${prefix_fg},#00fbfd},bold\] #{?client_prefix,󰘳 PREFIX,}#\[bg=${base_bg},fg=${base_fg}\]#($CURRENT_DIR/scripts/render-left.sh) "
+  left_fmt="#[bg=#{?client_prefix,${prefix_bg},${base_bg}},fg=#{?client_prefix,${prefix_fg},#00fbfd},bold] #{?client_prefix,󰘳 PREFIX,}#[bg=${base_bg},fg=${base_fg}]#($CURRENT_DIR/scripts/render-left.sh) "
   right_fmt="#($CURRENT_DIR/scripts/render-right.sh)"
 
   # Native self-contained status widgets.
+  tmux set-option -gq status-style "bg=${base_bg},fg=${base_fg}"
   tmux set-option -gq status-left "$left_fmt"
   tmux set-option -gq status-right "$right_fmt"
 

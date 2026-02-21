@@ -48,6 +48,7 @@ set -g @tooie-tmux-widget-weather 'on'
 # Widths
 set -g @tooie-tmux-status-left-length '600'
 set -g @tooie-tmux-status-right-length '400'
+set -g @tooie-tmux-status-justify 'centre'
 
 # Force native two-line status layout managed by tooie-tmux
 set -g @tooie-tmux-force-two-line 'on'
