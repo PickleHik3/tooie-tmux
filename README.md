@@ -1,40 +1,64 @@
 # tooie-tmux
 
-A self-contained TPM plugin for Termux/tmux status widgets with optional Shizuku-powered data sourcing via `tooie`.
+Termux-first tmux statusbar widgets, packaged as a self-contained TPM plugin.
 
-Designed to work best with the `shizuku-integration` branch of:
+![tooie-tmux statusbar screenshot](assets/statusbar.png)
 
-- https://github.com/PickleHik3/termux-launcher
+Designed to work best with the `shizuku-integration` branch of `termux-launcher`:
 
-## Features
+- `https://github.com/PickleHik3/termux-launcher`
 
-- Left widgets: battery, CPU, RAM (toggleable)
-- Right widgets: kew now-playing, Apps launcher label, weather (toggleable)
-- Optional data source: `tooie resources` (Shizuku backend) with fallback to local `/proc` + `termux-battery-status`
-- Native self-contained two-line status layout (no required split-statusbar/dotbar dependency)
-- Dotbar-compatible variables are still exported if dotbar is installed
-- Music ticker source: `kew` via MPRIS (https://github.com/ravachol/kew)
-- Weather source: wttr.in
+**What It Does**
+- Renders a two-line tmux statusbar (`status 2`):
+  - Line 1: window list
+  - Line 2: left/right widgets
+- Sets `status-left`, `status-right`, `status-style`, `status-left-length`, `status-right-length`, and `status-justify`.
+- Backs up your existing status options once (in `@tooie-tmux-backup-*` tmux options).
+
+**Widgets**
+- Left: battery, CPU, RAM
+- Right: kew now-playing (only when playing), Apps menu, weather
+
+Data sources:
+- Preferred: `tooie resources` (Shizuku-backed snapshot provider)
+- Fallbacks: `/proc` (CPU/RAM) and `termux-battery-status` (battery)
+- Weather: `wttr.in`
+- Music: `kew` via MPRIS (`https://github.com/ravachol/kew`)
 
 ## Install (TPM)
 
-Add to `.tmux.conf` before the TPM line:
+Add this before the TPM line in `~/.tmux.conf`:
 
 ```tmux
 set -g @plugin 'PickleHik3/tooie-tmux'
 ```
 
-Reload tmux and run `prefix + I`.
+Then in tmux: `prefix + I` (install) and `prefix + r` (reload, if you have a reload binding).
+
+## Common Setup
+
+Disable Shizuku-backed sourcing:
+
+```tmux
+set -g @tooie-tmux-enable-shizuku-data 'off'
+```
+
+Disable the Apps widget:
+
+```tmux
+set -g @tooie-tmux-widget-apps 'off'
+```
 
 ## Options
 
-Defaults are set to match the current theme/layout used in this repository.
+All options are `set -g` and can be placed anywhere before TPM.
 
 ```tmux
-# Master switch
+# Master switches
 set -g @tooie-tmux-enable 'on'
+set -g @tooie-tmux-force-two-line 'on'
 
-# Data source (on = use tooie resources when available)
+# Data source (use tooie resources when available)
 set -g @tooie-tmux-enable-shizuku-data 'on'
 
 # Widget toggles
@@ -45,20 +69,19 @@ set -g @tooie-tmux-widget-kew 'on'
 set -g @tooie-tmux-widget-apps 'on'
 set -g @tooie-tmux-widget-weather 'on'
 
-# Widths
+# Layout
 set -g @tooie-tmux-status-left-length '600'
 set -g @tooie-tmux-status-right-length '400'
-set -g @tooie-tmux-status-justify 'centre'
+set -g @tooie-tmux-status-justify 'centre'  # left|centre|right
 
-# Force native two-line status layout managed by tooie-tmux
-set -g @tooie-tmux-force-two-line 'on'
-
-# Colors/layout (dotbar-style overrides)
+# Base theme colors
 set -g @tooie-tmux-color-prefix-bg '#f9f972'
 set -g @tooie-tmux-color-prefix-fg '#241b30'
 set -g @tooie-tmux-color-base-bg '#241b30'
 set -g @tooie-tmux-color-base-fg '#55a8fb'
 set -g @tooie-tmux-color-kew '#36f9f6'
+
+# Widget colors/icons
 set -g @tooie-tmux-color-separator '#6b7089'
 set -g @tooie-tmux-color-ram '#ffb86c'
 set -g @tooie-tmux-color-empty '#5f5f87'
@@ -69,31 +92,35 @@ set -g @tooie-tmux-color-meter-4 '#a4e84a'
 set -g @tooie-tmux-color-meter-5 '#6ee7a2'
 set -g @tooie-tmux-color-meter-6 '#34d399'
 set -g @tooie-tmux-color-charging '#7dcfff'
-
-# Labels/icons
-set -g @tooie-tmux-apps-label '󰀻 Apps'
-set -g @tooie-tmux-apps-menu-file '' # optional override path
 set -g @tooie-tmux-icon-battery-full ''
 set -g @tooie-tmux-icon-battery-empty ''
 set -g @tooie-tmux-icon-battery-charging ' 󱈑'
+
+# Apps widget
+set -g @tooie-tmux-apps-label '󰀻 Apps'
+set -g @tooie-tmux-apps-menu-file ''  # optional override path
 ```
 
-## Apps Menu Config
+## Apps Menu (Android + Terminal)
 
-Apps widget entries are loaded from:
+The Apps widget opens a tmux menu and supports:
+- `android` entries: launch Android apps via `am start -n ...`
+- `terminal` entries: open a new tmux window and run a command
+
+Config file resolution order:
 
 1. `@tooie-tmux-apps-menu-file` (if set)
 2. `$HOME/.config/tooie-tmux/apps-menu.conf` (if present)
 3. Plugin default: `scripts/apps-menu.conf`
 
-Format:
+File format:
 
 ```text
 type|label|key|arg1|arg2
 ```
 
-- `android`: `arg1` is Android component name (`package/activity`)
-- `terminal`: `arg1` is shell command, `arg2` is tmux window name (optional)
+- `android`: `arg1` is `package/activity`
+- `terminal`: `arg1` is the command, `arg2` is tmux window name (optional)
 
 Example:
 
@@ -103,25 +130,15 @@ terminal|btop |B|btop|btop
 terminal|lazygit 󰊢|g|lazygit|git
 ```
 
-## Theme Overrides
-
-Widget script supports env overrides too. For persistent env overrides create:
-
-- `scripts/widgets/theme.conf` inside the plugin repo, or
-- set `TMUX_TOOIE_WIDGET_THEME_FILE` to a custom file path.
-
-Start from `scripts/widgets/theme.conf.example`.
-
-## Notes
-
-- Apps launcher binds `MouseDown1StatusRight` and `M-Enter`.
-- If `tooie` is unavailable/disabled, CPU+RAM+battery use local fallback metrics.
-- `@tooie-tmux-force-two-line` keeps line 1 for window list and line 2 for left/right widgets to avoid center contention truncation.
-
 ## Dependencies
 
 - Required: `tmux`, `jq`
 - Optional:
-  - `tooie` (for Shizuku-backed resource snapshots)
-  - `termux-api` (`termux-battery-status`) for fallback battery data
-  - `kew` + dbus for now-playing widget
+  - `tooie` (for Shizuku-backed snapshots)
+  - Termux:API + `termux-battery-status` (battery fallback)
+  - `kew` + dbus (now-playing)
+
+## Notes
+
+- Apps launcher binds `MouseDown1StatusRight` and `M-Enter`.
+- The default `scripts/apps-menu.conf` contains Termux/Android-specific app component names; most users should provide their own menu file.
