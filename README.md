@@ -15,7 +15,7 @@ A self-contained TPM plugin for Termux/tmux status widgets with optional Shizuku
 Add to `.tmux.conf` before the TPM line:
 
 ```tmux
-set -g @plugin 'YOUR_GITHUB_USER/tooie-tmux'
+set -g @plugin 'PickleHik3/tooie-tmux'
 ```
 
 Reload tmux and run `prefix + I`.
