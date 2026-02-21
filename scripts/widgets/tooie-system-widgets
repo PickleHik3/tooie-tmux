@@ -1,0 +1,242 @@
+#!/data/data/com.termux/files/usr/bin/sh
+
+# Render battery + CPU + RAM widgets from Tooie with lightweight caching.
+# Output is tmux-formatted text for use inside #(...).
+
+set -u
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/tmux-tooie"
+CACHE_FILE="$CACHE_DIR/resources.json"
+LOCK_DIR="$CACHE_DIR/.lock"
+TTL_SECONDS="${TMUX_TOOIE_WIDGET_TTL:-3}"
+LOCK_STALE_SECONDS=10
+QUERY_TIMEOUT="${TMUX_TOOIE_WIDGET_QUERY_TIMEOUT:-1}"
+ENABLE_SHIZUKU_DATA="${TOOIE_TMUX_ENABLE_SHIZUKU_DATA:-on}"
+SHOW_BATTERY="${TOOIE_TMUX_SHOW_BATTERY:-on}"
+SHOW_CPU="${TOOIE_TMUX_SHOW_CPU:-on}"
+SHOW_RAM="${TOOIE_TMUX_SHOW_RAM:-on}"
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+# Optional per-user overrides (shell assignments), e.g.:
+# TMUX_TOOIE_WIDGET_TTL=2
+# TMUX_TOOIE_CPU_COLOR="#7dcfff"
+THEME_FILE="${TMUX_TOOIE_WIDGET_THEME_FILE:-$SCRIPT_DIR/theme.conf}"
+[ -f "$THEME_FILE" ] && . "$THEME_FILE"
+
+# Theme defaults (override via env vars).
+EMPTY_COLOR="${TMUX_TOOIE_EMPTY_COLOR:-#5f5f87}"
+CPU_COLOR="${TMUX_TOOIE_CPU_COLOR:-#8be9fd}"
+RAM_COLOR="${TMUX_TOOIE_RAM_COLOR:-#ffb86c}"
+TEXT_COLOR="${TMUX_TOOIE_TEXT_COLOR:-#c0caf5}"
+SEP_COLOR="${TMUX_TOOIE_SEP_COLOR:-#6b7089}"
+METER_1_COLOR="${TMUX_TOOIE_METER_1_COLOR:-#ff5f5f}"
+METER_2_COLOR="${TMUX_TOOIE_METER_2_COLOR:-#ff875f}"
+METER_3_COLOR="${TMUX_TOOIE_METER_3_COLOR:-#ffd75f}"
+METER_4_COLOR="${TMUX_TOOIE_METER_4_COLOR:-#a4e84a}"
+METER_5_COLOR="${TMUX_TOOIE_METER_5_COLOR:-#6ee7a2}"
+METER_6_COLOR="${TMUX_TOOIE_METER_6_COLOR:-#34d399}"
+CHARGE_COLOR="${TMUX_TOOIE_CHARGE_COLOR:-#7dcfff}"
+
+CPU_SEGMENTS="${TMUX_TOOIE_CPU_SEGMENTS:-6}"
+BAT_SEGMENTS="${TMUX_TOOIE_BAT_SEGMENTS:-6}"
+
+BAT_FULL_ICON="${TMUX_TOOIE_BAT_FULL_ICON:-}"
+BAT_EMPTY_ICON="${TMUX_TOOIE_BAT_EMPTY_ICON:-}"
+BAT_CHARGING_ICON="${TMUX_TOOIE_BAT_CHARGING_ICON:- 󱈑}"
+
+mkdir -p "$CACHE_DIR"
+
+now_epoch() {
+  date +%s
+}
+
+cache_age() {
+  [ -f "$CACHE_FILE" ] || { echo 999999; return; }
+  now="$(now_epoch)"
+  mt="$(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)"
+  [ "$mt" -gt 0 ] || { echo 999999; return; }
+  echo $((now - mt))
+}
+
+cleanup_stale_lock() {
+  [ -d "$LOCK_DIR" ] || return 0
+  mt="$(stat -c %Y "$LOCK_DIR" 2>/dev/null || echo 0)"
+  now="$(now_epoch)"
+  if [ "$mt" -gt 0 ] && [ $((now - mt)) -gt "$LOCK_STALE_SECONDS" ]; then
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+is_on() {
+  case "$1" in
+    1|on|true|yes|enabled) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+collect_fallback_json() {
+  cores="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+  [ -n "$cores" ] || cores=1
+  [ "$cores" -gt 0 ] || cores=1
+  load1="$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo 0)"
+  cpu_pct="$(awk -v l="$load1" -v c="$cores" 'BEGIN{v=(l/c)*100; if(v<0)v=0; if(v>100)v=100; printf "%.2f", v}')"
+  mem_total_kb="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  mem_avail_kb="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  mem_total_b=$((mem_total_kb * 1024))
+  mem_avail_b=$((mem_avail_kb * 1024))
+  mem_used_b=$((mem_total_b - mem_avail_b))
+  [ "$mem_used_b" -lt 0 ] && mem_used_b=0
+
+  bat_level=0
+  bat_charging=false
+  if command -v termux-battery-status >/dev/null 2>&1; then
+    bjson="$(termux-battery-status 2>/dev/null || true)"
+    if [ -n "$bjson" ]; then
+      bat_level="$(printf '%s' "$bjson" | jq -r '.percentage // .level // 0' 2>/dev/null || echo 0)"
+      status="$(printf '%s' "$bjson" | jq -r '.status // ""' 2>/dev/null || echo '')"
+      case "$status" in
+        CHARGING|FULL) bat_charging=true ;;
+      esac
+    fi
+  fi
+
+  printf '{"cpuPercent":%s,"memUsedBytes":%s,"memTotalBytes":%s,"battery":{"levelPercent":%s,"charging":%s}}' \
+    "$cpu_pct" "$mem_used_b" "$mem_total_b" "$bat_level" "$bat_charging"
+}
+
+update_cache_if_needed() {
+  age="$(cache_age)"
+  [ "$age" -lt "$TTL_SECONDS" ] && return 0
+
+  cleanup_stale_lock
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    # Best effort refresh; keep old cache if query fails.
+    tmp="$CACHE_FILE.tmp.$$"
+    rc=1
+    if is_on "$ENABLE_SHIZUKU_DATA" && command -v tooie >/dev/null 2>&1; then
+      if command -v timeout >/dev/null 2>&1; then
+        timeout "$QUERY_TIMEOUT" tooie resources >"$tmp" 2>/dev/null || rc=$?
+        [ -s "$tmp" ] && rc=0
+      else
+        tooie resources >"$tmp" 2>/dev/null || rc=$?
+      fi
+    fi
+    if [ "$rc" -ne 0 ]; then
+      collect_fallback_json >"$tmp" 2>/dev/null || rc=$?
+      [ -s "$tmp" ] && rc=0
+    fi
+    if [ "$rc" -eq 0 ]; then
+      mv "$tmp" "$CACHE_FILE"
+    else
+      rm -f "$tmp"
+    fi
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+meter_color() {
+  idx="$1"
+  case "$idx" in
+    1) echo "$METER_1_COLOR" ;;
+    2) echo "$METER_2_COLOR" ;;
+    3) echo "$METER_3_COLOR" ;;
+    4) echo "$METER_4_COLOR" ;;
+    5) echo "$METER_5_COLOR" ;;
+    *) echo "$METER_6_COLOR" ;;
+  esac
+}
+
+render_battery() {
+  level="$1"
+  charging="$2"
+
+  [ "$level" -gt 100 ] && level=100
+  [ "$level" -lt 0 ] && level=0
+  [ "$BAT_SEGMENTS" -lt 1 ] && BAT_SEGMENTS=1
+
+  filled=$(( (level * BAT_SEGMENTS + 99) / 100 ))
+  [ "$filled" -gt "$BAT_SEGMENTS" ] && filled="$BAT_SEGMENTS"
+
+  meter=""
+  i=1
+  while [ "$i" -le "$BAT_SEGMENTS" ]; do
+    c="$(meter_color "$i")"
+    if [ "$i" -le "$filled" ]; then
+      meter="${meter}#[fg=${c}]${BAT_FULL_ICON}"
+    else
+      meter="${meter}#[fg=${c}]${BAT_EMPTY_ICON}"
+    fi
+    if [ "$i" -lt "$BAT_SEGMENTS" ]; then
+      meter="${meter}"
+    fi
+    i=$((i + 1))
+  done
+
+  if [ "$charging" = "true" ]; then
+    charge="#[fg=${CHARGE_COLOR}]${BAT_CHARGING_ICON}"
+  else
+    charge=""
+  fi
+
+  printf "%s%s#[default]" \
+    "$charge" "${charge:+ }$meter"
+}
+
+usage_color() {
+  v="$1"
+  if [ "$v" -le 10 ]; then echo "#34d399"
+  elif [ "$v" -le 20 ]; then echo "#6ee7a2"
+  elif [ "$v" -le 30 ]; then echo "#a4e84a"
+  elif [ "$v" -le 40 ]; then echo "#d9e84a"
+  elif [ "$v" -le 50 ]; then echo "#f6d84a"
+  elif [ "$v" -le 60 ]; then echo "#ffc857"
+  elif [ "$v" -le 70 ]; then echo "#ffad66"
+  elif [ "$v" -le 80 ]; then echo "#ff8f66"
+  elif [ "$v" -le 90 ]; then echo "#ff6f61"
+  else echo "#ff5f5f"
+  fi
+}
+
+render_widgets() {
+  [ -f "$CACHE_FILE" ] || exit 0
+
+  # Avoid failure spam if cache got corrupted.
+  if ! jq -e . "$CACHE_FILE" >/dev/null 2>&1; then
+    exit 0
+  fi
+
+  cpu="$(jq -r '.cpuPercent // 0' "$CACHE_FILE" 2>/dev/null)"
+  mem_used="$(jq -r '.memUsedBytes // 0' "$CACHE_FILE" 2>/dev/null)"
+  mem_total="$(jq -r '.memTotalBytes // 0' "$CACHE_FILE" 2>/dev/null)"
+  bat_level="$(jq -r '.battery.levelPercent // 0' "$CACHE_FILE" 2>/dev/null)"
+  bat_charging="$(jq -r '.battery.charging // false' "$CACHE_FILE" 2>/dev/null)"
+
+  cpu_pct="$(awk -v x="$cpu" 'BEGIN{printf "%.0f", x}')"
+  case "$cpu_pct" in
+    ''|*[!0-9]*) cpu_pct=0 ;;
+  esac
+  [ "$cpu_pct" -gt 100 ] && cpu_pct=100
+  [ "$cpu_pct" -lt 0 ] && cpu_pct=0
+  cpu_pct_fixed="$(printf "%02d" "$cpu_pct")"
+  cpu_usage_color="$(usage_color "$cpu_pct")"
+  ram_text="$(awk -v u="$mem_used" -v t="$mem_total" 'BEGIN{printf "%.1f/%.1fG", u/1073741824, t/1073741824}')"
+  bat_text="$(render_battery "$bat_level" "$bat_charging")"
+  out=""
+
+  if is_on "$SHOW_BATTERY"; then
+    out="$bat_text"
+  fi
+  if is_on "$SHOW_CPU"; then
+    [ -n "$out" ] && out="${out}#[fg=${SEP_COLOR}] | "
+    out="${out}#[fg=${cpu_usage_color}] ${cpu_pct_fixed}%"
+  fi
+  if is_on "$SHOW_RAM"; then
+    [ -n "$out" ] && out="${out}#[fg=${SEP_COLOR}] | "
+    out="${out}#[fg=${RAM_COLOR}] ${ram_text}"
+  fi
+  printf "%s#[default]" "$out"
+}
+
+update_cache_if_needed
+render_widgets
