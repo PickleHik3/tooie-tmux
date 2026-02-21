@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/sh
 
-# Show launcher menu for Android apps from tmux.
+# Show launcher menu for Android and terminal apps from tmux.
 # Usage:
 #   launch-apps-menu.sh mouse   # open at mouse location
 #   launch-apps-menu.sh key     # open at a fixed visible location
@@ -8,6 +8,46 @@
 mode="${1:-key}"
 mx="$2"
 my="$3"
+CURRENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+. "$CURRENT_DIR/scripts/helpers.sh"
+
+escape_single_quotes() {
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+}
+
+build_action() {
+  entry_type="$1"
+  entry_label="$2"
+  arg1="$3"
+  arg2="$4"
+
+  label_esc="$(escape_single_quotes "$entry_label")"
+  arg1_esc="$(escape_single_quotes "$arg1")"
+  arg2_esc="$(escape_single_quotes "$arg2")"
+
+  case "$entry_type" in
+    android)
+      printf "%s" "display-message -d 1200 '#[fg=#f4bf75,bold]Opening $label_esc'; run-shell 'am start -n $arg1_esc > /dev/null 2>&1'"
+      ;;
+    terminal)
+      window_name="$arg2_esc"
+      [ -n "$window_name" ] || window_name="$label_esc"
+      printf "%s" "new-window -c '#{pane_current_path}' -n '$window_name' '$arg1_esc'"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+menu_file="$(get_tmux_option '@tooie-tmux-apps-menu-file' '')"
+if [ -z "$menu_file" ]; then
+  if [ -f "$HOME/.config/tooie-tmux/apps-menu.conf" ]; then
+    menu_file="$HOME/.config/tooie-tmux/apps-menu.conf"
+  else
+    menu_file="$CURRENT_DIR/scripts/apps-menu.conf"
+  fi
+fi
 
 if [ "$mode" = "mouse" ]; then
   if [ -n "$mx" ] && [ -n "$my" ]; then
@@ -23,12 +63,24 @@ else
   y="P"
 fi
 
-tmux display-menu -T " Apps" -x "$x" -y "$y" \
-  "YouTube 󰗃" y "display-message -d 1200 '#[fg=#f4bf75,bold]Opening YouTube 󰗃'; run-shell 'am start -n app.revanced.android.youtube/com.google.android.youtube.app.honeycomb.Shell\\\$HomeActivity > /dev/null 2>&1'" \
-  "Browser 󰖟" b "display-message -d 1200 '#[fg=#f4bf75,bold]Opening Browser 󰖟'; run-shell 'am start -n com.brave.browser_nightly/com.google.android.apps.chrome.Main > /dev/null 2>&1'" \
-  "WhatsApp 󰖣" w "display-message -d 1200 '#[fg=#f4bf75,bold]Opening WhatsApp 󰖣'; run-shell 'am start -n com.whatsapp/com.whatsapp.Main > /dev/null 2>&1'" \
-  "Mihon 󰄛" t "display-message -d 1200 '#[fg=#f4bf75,bold]Opening Mihon 󰄛'; run-shell 'am start -n app.mihon/eu.kanade.tachiyomi.ui.main.MainActivity > /dev/null 2>&1'" \
-  "Solid Explorer 󰉋" f "display-message -d 1200 '#[fg=#f4bf75,bold]Opening Solid Explorer 󰉋'; run-shell 'am start -n pl.solidexplorer2/pl.solidexplorer.SolidExplorer > /dev/null 2>&1'" \
-  "Settings 󰒓" s "display-message -d 1200 '#[fg=#f4bf75,bold]Opening Settings 󰒓'; run-shell 'am start -n com.android.settings/com.android.settings.Settings > /dev/null 2>&1'" \
-  "App Search 󱡴" l "display-message -d 1200 '#[fg=#f4bf75,bold]Opening App Search 󱡴'; run-shell 'am start -n net.nhiroki.bluelineconsole/net.nhiroki.bluelineconsole.applicationMain.MainActivity > /dev/null 2>&1'" \
-  "Lock Screen 󰌾" z "display-message -d 1200 '#[fg=#f4bf75,bold]Opening Lock Screen 󰌾'; run-shell 'am start -n com.tiendnm.zukulock/com.tiendnm.zukulock.MainActivity > /dev/null 2>&1'"
+set --
+if [ -f "$menu_file" ]; then
+  while IFS='|' read -r entry_type entry_label entry_key entry_arg1 entry_arg2; do
+    [ -n "$entry_type" ] || continue
+    case "$entry_type" in
+      \#*) continue ;;
+    esac
+    [ -n "$entry_label" ] || continue
+    action="$(build_action "$entry_type" "$entry_label" "$entry_arg1" "$entry_arg2" || true)"
+    [ -n "$action" ] || continue
+    set -- "$@" "$entry_label" "$entry_key" "$action"
+  done < "$menu_file"
+fi
+
+if [ "$#" -eq 0 ]; then
+  set -- \
+    "btop " B "new-window -c '#{pane_current_path}' -n 'btop' 'btop'" \
+    "App Search 󱡴" l "run-shell 'am start -n net.nhiroki.bluelineconsole/net.nhiroki.bluelineconsole.applicationMain.MainActivity > /dev/null 2>&1'"
+fi
+
+tmux display-menu -T " Apps" -x "$x" -y "$y" "$@"

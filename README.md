@@ -72,9 +72,35 @@ set -g @tooie-tmux-color-charging '#7dcfff'
 
 # Labels/icons
 set -g @tooie-tmux-apps-label '󰀻 Apps'
+set -g @tooie-tmux-apps-menu-file '' # optional override path
 set -g @tooie-tmux-icon-battery-full ''
 set -g @tooie-tmux-icon-battery-empty ''
 set -g @tooie-tmux-icon-battery-charging ' 󱈑'
+```
+
+## Apps Menu Config
+
+Apps widget entries are loaded from:
+
+1. `@tooie-tmux-apps-menu-file` (if set)
+2. `$HOME/.config/tooie-tmux/apps-menu.conf` (if present)
+3. Plugin default: `scripts/apps-menu.conf`
+
+Format:
+
+```text
+type|label|key|arg1|arg2
+```
+
+- `android`: `arg1` is Android component name (`package/activity`)
+- `terminal`: `arg1` is shell command, `arg2` is tmux window name (optional)
+
+Example:
+
+```text
+android|Settings 󰒓|s|com.android.settings/com.android.settings.Settings|
+terminal|btop |B|btop|btop
+terminal|lazygit 󰊢|g|lazygit|git
 ```
 
 ## Theme Overrides

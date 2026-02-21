@@ -47,6 +47,7 @@ set_tmux_option_if_unset "@tooie-tmux-color-base-bg" "#241b30"
 set_tmux_option_if_unset "@tooie-tmux-color-base-fg" "#55a8fb"
 set_tmux_option_if_unset "@tooie-tmux-color-kew" "#36f9f6"
 set_tmux_option_if_unset "@tooie-tmux-apps-label" "󰀻 Apps"
+set_tmux_option_if_unset "@tooie-tmux-apps-menu-file" ""
 
 if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
   left_len="$(get_tmux_option "@tooie-tmux-status-left-length" "600")"
