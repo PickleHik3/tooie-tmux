@@ -46,6 +46,8 @@ set_tmux_option_if_unset "@tooie-tmux-color-prefix-fg" "#241b30"
 set_tmux_option_if_unset "@tooie-tmux-color-base-bg" "#241b30"
 set_tmux_option_if_unset "@tooie-tmux-color-base-fg" "#55a8fb"
 set_tmux_option_if_unset "@tooie-tmux-color-kew" "#36f9f6"
+set_tmux_option_if_unset "@tooie-tmux-color-window-inactive" "#75715e"
+set_tmux_option_if_unset "@tooie-tmux-color-window-active" "#f4bf75"
 set_tmux_option_if_unset "@tooie-tmux-apps-label" "󰀻 Apps"
 set_tmux_option_if_unset "@tooie-tmux-apps-menu-file" ""
 
@@ -58,6 +60,8 @@ if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
   prefix_fg="$(get_tmux_option "@tooie-tmux-color-prefix-fg" "#241b30")"
   base_bg="$(get_tmux_option "@tooie-tmux-color-base-bg" "#241b30")"
   base_fg="$(get_tmux_option "@tooie-tmux-color-base-fg" "#55a8fb")"
+  window_inactive_fg="$(get_tmux_option "@tooie-tmux-color-window-inactive" "#75715e")"
+  window_active_fg="$(get_tmux_option "@tooie-tmux-color-window-active" "#f4bf75")"
   tmux set-option -gq status-left-length "$left_len"
   tmux set-option -gq status-right-length "$right_len"
   tmux set-option -gq status-justify "$status_justify"
@@ -67,6 +71,10 @@ if is_on "$(get_tmux_option "@tooie-tmux-enable" "on")"; then
 
   # Native self-contained status widgets.
   tmux set-option -gq status-style "bg=${base_bg},fg=${base_fg}"
+  tmux set-window-option -gq window-status-style "fg=${window_inactive_fg},bg=default"
+  tmux set-window-option -gq window-status-current-style "fg=${window_active_fg},bg=default,bold"
+  tmux set-window-option -gq window-status-format "#W#{?window_flags,#{window_flags}, }"
+  tmux set-window-option -gq window-status-current-format "#W#{?window_flags,#{window_flags}, }"
   tmux set-option -gq status-left "$left_fmt"
   tmux set-option -gq status-right "$right_fmt"
 

@@ -80,6 +80,8 @@ set -g @tooie-tmux-color-prefix-fg '#241b30'
 set -g @tooie-tmux-color-base-bg '#241b30'
 set -g @tooie-tmux-color-base-fg '#55a8fb'
 set -g @tooie-tmux-color-kew '#36f9f6'
+set -g @tooie-tmux-color-window-inactive '#75715e'
+set -g @tooie-tmux-color-window-active '#f4bf75'
 
 # Widget colors/icons
 set -g @tooie-tmux-color-separator '#6b7089'
